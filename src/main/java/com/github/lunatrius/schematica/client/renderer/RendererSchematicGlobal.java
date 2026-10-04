@@ -26,7 +26,7 @@ public class RendererSchematicGlobal {
     private final Minecraft minecraft = Minecraft.getMinecraft();
     private final Profiler profiler = this.minecraft.mcProfiler;
 
-    private final Frustrum frustrum = new Frustrum();
+    private Frustrum frustrum = new Frustrum();
     public RenderBlocks renderBlocks = null;
     public final List<RendererSchematicChunk> sortedRendererSchematicChunk = new ArrayList<>();
     private final RendererSchematicChunkComparator rendererSchematicChunkComparator = new RendererSchematicChunkComparator();
@@ -50,6 +50,11 @@ public class RendererSchematicGlobal {
     }
 
     public void render(SchematicWorld schematic) {
+        // A new Frustrum every frame, read before the translate below so it holds the camera alone.
+        // Angelica snapshots a Frustrum's camera when it is constructed, so one kept across frames
+        // culls against its first frame's view and hides the hologram at other angles.
+        this.frustrum = new Frustrum();
+
         GL11.glPushMatrix();
         GL11.glBlendFunc(GL11.GL_SRC_ALPHA, GL11.GL_ONE_MINUS_SRC_ALPHA);
         GL11.glEnable(GL11.GL_BLEND);
