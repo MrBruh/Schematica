@@ -4,6 +4,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.TreeSet;
 
 import net.minecraft.block.Block;
 import net.minecraft.entity.Entity;
@@ -33,127 +34,107 @@ public class SchematicAlpha extends SchematicFormat {
 
     @Override
     public ISchematic readFromNBT(NBTTagCompound tagCompound) {
-        if (ConfigurationHandler.useSchematicplusFormat) {
-            ItemStack icon = SchematicUtil.getIconFromNBT(tagCompound);
+        ItemStack icon = SchematicUtil.getIconFromNBT(tagCompound);
+        DecodedBlocks blocks = decodeBlocks(tagCompound, ConfigurationHandler.useSchematicplusFormat);
 
-            byte[] localBlocks = tagCompound.getByteArray(Names.NBT.BLOCKS);
-            byte[] localMetadata = tagCompound.getByteArray(Names.NBT.DATA);
-            byte[] extraBlocks = tagCompound.getByteArray(Names.NBT.ADD_BLOCKS);
-
-            short width = tagCompound.getShort(Names.NBT.WIDTH);
-            short length = tagCompound.getShort(Names.NBT.LENGTH);
-            short height = tagCompound.getShort(Names.NBT.HEIGHT);
-
-            Short id;
-            Map<Short, Short> oldToNew = new HashMap<>();
-            if (tagCompound.hasKey(Names.NBT.MAPPING_SCHEMATICA)) {
-                NBTTagCompound mapping = tagCompound.getCompoundTag(Names.NBT.MAPPING_SCHEMATICA);
-                Set<String> names = mapping.func_150296_c();
-                for (String name : names) {
-                    oldToNew.put(mapping.getShort(name), (short) BLOCK_REGISTRY.getId(name));
+        ISchematic schematic = new Schematic(icon, blocks.width, blocks.height, blocks.length);
+        for (int x = 0; x < blocks.width; x++) {
+            for (int y = 0; y < blocks.height; y++) {
+                for (int z = 0; z < blocks.length; z++) {
+                    int index = blocks.index(x, y, z);
+                    schematic.setBlock(
+                        x,
+                        y,
+                        z,
+                        BLOCK_REGISTRY.getObjectById(blocks.blockIds[index]),
+                        blocks.metadata[index]);
                 }
             }
-
-            ISchematic schematic = new Schematic(icon, width, height, length);
-            for (int x = 0; x < width; x++) {
-                for (int y = 0; y < height; y++) {
-                    for (int z = 0; z < length; z++) {
-                        int index = x + (y * length + z) * width;
-                        int blockID = (localBlocks[index] & 0xFF) | ((extraBlocks[index] & 0xFF) * 256);
-                        int meta = localMetadata[index] & 0xFF;
-
-                        if ((id = oldToNew.get((short) blockID)) != null) {
-                            blockID = id;
-                        }
-
-                        schematic.setBlock(x, y, z, BLOCK_REGISTRY.getObjectById(blockID), meta);
-                    }
-                }
-            }
-
-            NBTTagList tileEntitiesList = tagCompound.getTagList(Names.NBT.TILE_ENTITIES, Constants.NBT.TAG_COMPOUND);
-
-            for (int i = 0; i < tileEntitiesList.tagCount(); i++) {
-                try {
-                    TileEntity tileEntity = NBTHelper.readTileEntityFromCompound(tileEntitiesList.getCompoundTagAt(i));
-                    if (tileEntity != null) {
-                        schematic.setTileEntity(tileEntity.xCoord, tileEntity.yCoord, tileEntity.zCoord, tileEntity);
-                    }
-                } catch (Exception e) {
-                    Reference.logger.error("TileEntity failed to load properly!", e);
-                }
-            }
-
-            return schematic;
-        } else {
-            ItemStack icon = SchematicUtil.getIconFromNBT(tagCompound);
-
-            byte[] localBlocks = tagCompound.getByteArray(Names.NBT.BLOCKS);
-            byte[] localMetadata = tagCompound.getByteArray(Names.NBT.DATA);
-
-            boolean extra = false;
-            byte[] extraBlocks = null;
-            byte[] extraBlocksNibble;
-            if (tagCompound.hasKey(Names.NBT.ADD_BLOCKS)) {
-                extra = true;
-                extraBlocksNibble = tagCompound.getByteArray(Names.NBT.ADD_BLOCKS);
-                extraBlocks = new byte[extraBlocksNibble.length * 2];
-                for (int i = 0; i < extraBlocksNibble.length; i++) {
-                    extraBlocks[i * 2 + 0] = (byte) ((extraBlocksNibble[i] >> 4) & 0xF);
-                    extraBlocks[i * 2 + 1] = (byte) (extraBlocksNibble[i] & 0xF);
-                }
-            } else if (tagCompound.hasKey(Names.NBT.ADD_BLOCKS_SCHEMATICA)) {
-                extra = true;
-                extraBlocks = tagCompound.getByteArray(Names.NBT.ADD_BLOCKS_SCHEMATICA);
-            }
-
-            short width = tagCompound.getShort(Names.NBT.WIDTH);
-            short length = tagCompound.getShort(Names.NBT.LENGTH);
-            short height = tagCompound.getShort(Names.NBT.HEIGHT);
-
-            Short id;
-            Map<Short, Short> oldToNew = new HashMap<>();
-            if (tagCompound.hasKey(Names.NBT.MAPPING_SCHEMATICA)) {
-                NBTTagCompound mapping = tagCompound.getCompoundTag(Names.NBT.MAPPING_SCHEMATICA);
-                Set<String> names = mapping.func_150296_c();
-                for (String name : names) {
-                    oldToNew.put(mapping.getShort(name), (short) BLOCK_REGISTRY.getId(name));
-                }
-            }
-
-            ISchematic schematic = new Schematic(icon, width, height, length);
-            for (int x = 0; x < width; x++) {
-                for (int y = 0; y < height; y++) {
-                    for (int z = 0; z < length; z++) {
-                        int index = x + (y * length + z) * width;
-                        int blockID = (localBlocks[index] & 0xFF) | (extra ? ((extraBlocks[index] & 0xFF) << 8) : 0);
-                        int meta = localMetadata[index] & 0xFF;
-
-                        if ((id = oldToNew.get((short) blockID)) != null) {
-                            blockID = id;
-                        }
-
-                        schematic.setBlock(x, y, z, BLOCK_REGISTRY.getObjectById(blockID), meta);
-                    }
-                }
-            }
-
-            NBTTagList tileEntitiesList = tagCompound.getTagList(Names.NBT.TILE_ENTITIES, Constants.NBT.TAG_COMPOUND);
-
-            for (int i = 0; i < tileEntitiesList.tagCount(); i++) {
-                try {
-                    TileEntity tileEntity = NBTHelper.readTileEntityFromCompound(tileEntitiesList.getCompoundTagAt(i));
-                    if (tileEntity != null) {
-                        schematic.setTileEntity(tileEntity.xCoord, tileEntity.yCoord, tileEntity.zCoord, tileEntity);
-                    }
-                } catch (Exception e) {
-                    Reference.logger.error("TileEntity failed to load properly!", e);
-                }
-            }
-
-            return schematic;
         }
 
+        NBTTagList tileEntitiesList = tagCompound.getTagList(Names.NBT.TILE_ENTITIES, Constants.NBT.TAG_COMPOUND);
+
+        for (int i = 0; i < tileEntitiesList.tagCount(); i++) {
+            try {
+                TileEntity tileEntity = NBTHelper.readTileEntityFromCompound(tileEntitiesList.getCompoundTagAt(i));
+                if (tileEntity != null) {
+                    schematic.setTileEntity(tileEntity.xCoord, tileEntity.yCoord, tileEntity.zCoord, tileEntity);
+                }
+            } catch (Exception e) {
+                Reference.logger.error("TileEntity failed to load properly!", e);
+            }
+        }
+
+        return schematic;
+    }
+
+    /**
+     * Decodes the block grid of an Alpha schematic: {@code Blocks}, the high id bits from {@code AddBlocks} or
+     * {@code Add}, {@code Data}, and the {@code SchematicaMapping} remap onto this game's block ids. It reads no tile
+     * entities and builds no {@link ISchematic}, so the metadata keeps all eight bits of each {@code Data} byte.
+     *
+     * @param extendedFormat true for the schemplus layout, whose {@code AddBlocks} holds one whole byte per cell
+     *                       rather than a nibble
+     */
+    public static DecodedBlocks decodeBlocks(NBTTagCompound tagCompound, boolean extendedFormat) {
+        byte[] localBlocks = tagCompound.getByteArray(Names.NBT.BLOCKS);
+        byte[] localMetadata = tagCompound.getByteArray(Names.NBT.DATA);
+
+        byte[] extraBlocks = null;
+        if (extendedFormat) {
+            extraBlocks = tagCompound.getByteArray(Names.NBT.ADD_BLOCKS);
+        } else if (tagCompound.hasKey(Names.NBT.ADD_BLOCKS)) {
+            byte[] extraBlocksNibble = tagCompound.getByteArray(Names.NBT.ADD_BLOCKS);
+            extraBlocks = new byte[extraBlocksNibble.length * 2];
+            for (int i = 0; i < extraBlocksNibble.length; i++) {
+                extraBlocks[i * 2 + 0] = (byte) ((extraBlocksNibble[i] >> 4) & 0xF);
+                extraBlocks[i * 2 + 1] = (byte) (extraBlocksNibble[i] & 0xF);
+            }
+        } else if (tagCompound.hasKey(Names.NBT.ADD_BLOCKS_SCHEMATICA)) {
+            extraBlocks = tagCompound.getByteArray(Names.NBT.ADD_BLOCKS_SCHEMATICA);
+        }
+
+        short width = tagCompound.getShort(Names.NBT.WIDTH);
+        short length = tagCompound.getShort(Names.NBT.LENGTH);
+        short height = tagCompound.getShort(Names.NBT.HEIGHT);
+
+        Short id;
+        Map<Short, Short> oldToNew = new HashMap<>();
+        Map<Short, String> oldToName = new HashMap<>();
+        if (tagCompound.hasKey(Names.NBT.MAPPING_SCHEMATICA)) {
+            NBTTagCompound mapping = tagCompound.getCompoundTag(Names.NBT.MAPPING_SCHEMATICA);
+            Set<String> names = mapping.func_150296_c();
+            for (String name : names) {
+                oldToNew.put(mapping.getShort(name), (short) BLOCK_REGISTRY.getId(name));
+                oldToName.put(mapping.getShort(name), name);
+            }
+        }
+
+        int[] blockIds = new int[width * height * length];
+        int[] metadata = new int[blockIds.length];
+        Set<String> unresolvedNames = new TreeSet<>();
+        for (int x = 0; x < width; x++) {
+            for (int y = 0; y < height; y++) {
+                for (int z = 0; z < length; z++) {
+                    int index = x + (y * length + z) * width;
+                    int blockID = (localBlocks[index] & 0xFF)
+                        | (extraBlocks != null ? ((extraBlocks[index] & 0xFF) << 8) : 0);
+                    int meta = localMetadata[index] & 0xFF;
+
+                    if ((id = oldToNew.get((short) blockID)) != null) {
+                        if (id < 0) {
+                            unresolvedNames.add(oldToName.get((short) blockID));
+                        }
+                        blockID = id;
+                    }
+
+                    blockIds[index] = blockID;
+                    metadata[index] = meta;
+                }
+            }
+        }
+
+        return new DecodedBlocks(width, height, length, blockIds, metadata, unresolvedNames);
     }
 
     @Override
