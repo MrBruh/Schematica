@@ -26,6 +26,7 @@ import net.minecraftforge.common.DimensionManager;
 import net.minecraftforge.common.util.Constants;
 
 import com.github.lunatrius.schematica.compat.GTPasteCompat;
+import com.github.lunatrius.schematica.compat.GTPasteUpdates;
 import com.github.lunatrius.schematica.handler.ConfigurationHandler;
 import com.github.lunatrius.schematica.nbt.NBTHelper;
 import com.github.lunatrius.schematica.reference.Names;
@@ -34,6 +35,7 @@ import com.github.lunatrius.schematica.world.schematic.DecodedBlocks;
 import com.github.lunatrius.schematica.world.schematic.SchematicAlpha;
 import com.github.lunatrius.schematica.world.schematic.SchematicUtil;
 
+import cpw.mods.fml.common.Loader;
 import cpw.mods.fml.common.registry.FMLControlledNamespacedRegistry;
 import cpw.mods.fml.common.registry.GameData;
 
@@ -52,10 +54,12 @@ import cpw.mods.fml.common.registry.GameData;
  *    nothing solid in the way unless force
  *
  *  write:
- *    force: empty the inventories in the box, so nothing spills
- *    setBlock(flag 2) on every cell, bottom up (a GT frame's metadata comes from its tile NBT)
- *    each tile NBT: copy, move to world x/y/z, fill a GT owner, create, setTileEntity
- *    markBlockForUpdate on every tile entity cell; no neighbour notification pass
+ *    GT: hold back its machine update queue, so the paste loads like a chunk (GTPasteUpdates)
+ *    | force: empty the inventories in the box, so nothing spills
+ *    | setBlock(flag 2) on every cell, bottom up (a GT frame's metadata comes from its tile NBT)
+ *    | each tile NBT: copy, move to world x/y/z, fill a GT owner, create, setTileEntity
+ *    | markBlockForUpdate on every tile entity cell; no neighbour notification pass
+ *    GT: restore the queue, even when the paste failed part way
  *    force: remove the item entities this paste spilled after all
  * </pre>
  *
@@ -157,94 +161,102 @@ public final class SchematicPaster {
             refuseOccupiedTarget(world, box);
         }
 
-        // Nothing has changed in the world until here.
-        if (force) {
-            emptyInventories(world, box, warnings);
-        }
-
+        // Nothing has changed in the world until here. GT's machine update queue stays off until every tile entity is
+        // in, so the paste loads like a chunk does; see GTPasteUpdates for why.
         int placedBlocks = 0;
-        for (int y = 0; y < blocks.height; y++) {
-            for (int z = 0; z < blocks.length; z++) {
-                for (int x = 0; x < blocks.width; x++) {
-                    final int index = blocks.index(x, y, z);
-                    final Block block = cells[index];
-                    final int wx = box.minX + x;
-                    final int wy = box.minY + y;
-                    final int wz = box.minZ + z;
+        final List<int[]> tileCells = new ArrayList<>();
+        final boolean gtUpdatesWereEnabled = gregtech != null && GTPasteUpdates.suspend();
+        try {
+            if (force) {
+                emptyInventories(world, box, warnings);
+            }
 
-                    world.setBlock(wx, wy, wz, block, metadata[index], 2);
-                    if (block != Blocks.air) {
-                        placedBlocks++;
-                    }
+            for (int y = 0; y < blocks.height; y++) {
+                for (int z = 0; z < blocks.length; z++) {
+                    for (int x = 0; x < blocks.width; x++) {
+                        final int index = blocks.index(x, y, z);
+                        final Block block = cells[index];
+                        final int wx = box.minX + x;
+                        final int wy = box.minY + y;
+                        final int wz = box.minZ + z;
 
-                    if (gregtech != null && gregtech.isFrame(block)) {
-                        final int stored = world.getBlockMetadata(wx, wy, wz);
-                        if (stored != metadata[index]) {
-                            warnings.add(
-                                String.format(
-                                    "GT frame at %d %d %d holds metadata %d instead of %d, so this world cannot store"
-                                        + " its material (is EndlessIDs installed?); it gets no tile entity",
-                                    wx,
-                                    wy,
-                                    wz,
-                                    stored,
-                                    metadata[index]));
-                            tiles.remove(index);
+                        world.setBlock(wx, wy, wz, block, metadata[index], 2);
+                        if (block != Blocks.air) {
+                            placedBlocks++;
+                        }
+
+                        if (gregtech != null && gregtech.isFrame(block)) {
+                            final int stored = world.getBlockMetadata(wx, wy, wz);
+                            if (stored != metadata[index]) {
+                                warnings.add(
+                                    String.format(
+                                        "GT frame at %d %d %d holds metadata %d instead of %d, so this world cannot"
+                                            + " store its material (is EndlessIDs installed?); it gets no tile entity",
+                                        wx,
+                                        wy,
+                                        wz,
+                                        stored,
+                                        metadata[index]));
+                                tiles.remove(index);
+                            }
                         }
                     }
                 }
             }
-        }
 
-        final List<int[]> tileCells = new ArrayList<>();
-        for (Map.Entry<Integer, NBTTagCompound> entry : tiles.entrySet()) {
-            final int[] cell = worldPosition(blocks, box, entry.getKey());
-            final NBTTagCompound tag = (NBTTagCompound) entry.getValue()
-                .copy();
-            final String id = tag.getString("id");
+            for (Map.Entry<Integer, NBTTagCompound> entry : tiles.entrySet()) {
+                final int[] cell = worldPosition(blocks, box, entry.getKey());
+                final NBTTagCompound tag = (NBTTagCompound) entry.getValue()
+                    .copy();
+                final String id = tag.getString("id");
 
-            final Block block = world.getBlock(cell[0], cell[1], cell[2]);
-            final int meta = world.getBlockMetadata(cell[0], cell[1], cell[2]);
-            if (!block.hasTileEntity(meta)) {
-                // world.setTileEntity would still add it to the ticking list, as an orphan no chunk holds.
-                warnings.add(
-                    String.format(
-                        "Skipped tile entity %s at %d %d %d: the block there (%s, metadata %d) has no tile entity",
-                        id,
-                        cell[0],
-                        cell[1],
-                        cell[2],
-                        BLOCK_REGISTRY.getNameForObject(block),
-                        meta));
-                continue;
+                final Block block = world.getBlock(cell[0], cell[1], cell[2]);
+                final int meta = world.getBlockMetadata(cell[0], cell[1], cell[2]);
+                if (!block.hasTileEntity(meta)) {
+                    // world.setTileEntity would still add it to the ticking list, as an orphan no chunk holds.
+                    warnings.add(
+                        String.format(
+                            "Skipped tile entity %s at %d %d %d: the block there (%s, metadata %d) has no tile entity",
+                            id,
+                            cell[0],
+                            cell[1],
+                            cell[2],
+                            BLOCK_REGISTRY.getNameForObject(block),
+                            meta));
+                    continue;
+                }
+
+                tag.setInteger("x", cell[0]);
+                tag.setInteger("y", cell[1]);
+                tag.setInteger("z", cell[2]);
+                if (gregtech != null) {
+                    GTPasteCompat.fillOwner(tag, player);
+                }
+
+                final TileEntity tileEntity = createTileEntity(tag);
+                if (tileEntity == null) {
+                    warnings.add(
+                        String.format(
+                            "Could not create tile entity %s at %d %d %d (is its mod installed?)",
+                            id,
+                            cell[0],
+                            cell[1],
+                            cell[2]));
+                    continue;
+                }
+
+                world.setTileEntity(cell[0], cell[1], cell[2], tileEntity);
+                world.markTileEntityChunkModified(cell[0], cell[1], cell[2], tileEntity);
+                tileCells.add(cell);
             }
 
-            tag.setInteger("x", cell[0]);
-            tag.setInteger("y", cell[1]);
-            tag.setInteger("z", cell[2]);
+            for (int[] cell : tileCells) {
+                world.markBlockForUpdate(cell[0], cell[1], cell[2]);
+            }
+        } finally {
             if (gregtech != null) {
-                GTPasteCompat.fillOwner(tag, player);
+                GTPasteUpdates.restore(gtUpdatesWereEnabled);
             }
-
-            final TileEntity tileEntity = createTileEntity(tag);
-            if (tileEntity == null) {
-                warnings.add(
-                    String.format(
-                        "Could not create tile entity %s at %d %d %d (is its mod installed?)",
-                        id,
-                        cell[0],
-                        cell[1],
-                        cell[2]));
-                continue;
-            }
-
-            world.setTileEntity(cell[0], cell[1], cell[2], tileEntity);
-            world.markTileEntityChunkModified(cell[0], cell[1], cell[2], tileEntity);
-            tileCells.add(cell);
-        }
-
-        for (int[] cell : tileCells) {
-            world.markBlockForUpdate(cell[0], cell[1], cell[2]);
         }
 
         final int removedItems = force ? removeFreshItems(world, box) : 0;
@@ -293,12 +305,22 @@ public final class SchematicPaster {
         }
 
         final List<String> warnings = new ArrayList<>();
-        emptyInventories(world, box, warnings);
-        for (int y = box.maxY; y >= box.minY; y--) {
-            for (int z = box.minZ; z <= box.maxZ; z++) {
-                for (int x = box.minX; x <= box.maxX; x++) {
-                    world.setBlock(x, y, z, Blocks.air, 0, 2);
+        // Removing a GT machine block queues a machine update as well (BlockMachines.breakBlock), so undo holds GT's
+        // queue back exactly as a paste does.
+        final boolean gregtech = Loader.isModLoaded(GTPasteCompat.MOD_ID);
+        final boolean gtUpdatesWereEnabled = gregtech && GTPasteUpdates.suspend();
+        try {
+            emptyInventories(world, box, warnings);
+            for (int y = box.maxY; y >= box.minY; y--) {
+                for (int z = box.minZ; z <= box.maxZ; z++) {
+                    for (int x = box.minX; x <= box.maxX; x++) {
+                        world.setBlock(x, y, z, Blocks.air, 0, 2);
+                    }
                 }
+            }
+        } finally {
+            if (gregtech) {
+                GTPasteUpdates.restore(gtUpdatesWereEnabled);
             }
         }
         final int removedItems = removeFreshItems(world, box);
