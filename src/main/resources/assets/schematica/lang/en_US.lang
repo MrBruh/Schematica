@@ -179,3 +179,11 @@ schematica.command.paste.warnings=%d warnings, all in the server log. The first:
 schematica.command.paste.nothingToUndo=You have no paste to undo.
 schematica.command.paste.undoNotLoaded=The area of your last paste is not loaded. Go back to it and try again.
 schematica.command.paste.undone=Cleared your last paste (%d x %d x %d) back to air. Blocks it replaced are not restored.
+
+# commands - paste here
+schematica.command.pasteHere.usage=/schematicaPasteHere [force]
+schematica.command.pasteHere.noSchematic=No schematic is loaded.
+schematica.command.pasteHere.transformed=The loaded schematic is rotated or flipped, and a paste writes the file as it was saved. Rotate and flip it back first.
+schematica.command.pasteHere.noPath=The loaded schematic's file is not known. Load it again from the load screen.
+schematica.command.pasteHere.unsendablePath=The path %s cannot go through chat unchanged (it has double spaces, special characters, or "force" as its last word). Rename the file.
+schematica.command.pasteHere.tooLong=The paste command would be %d characters, over the chat limit of %d. Move the file to a shorter path.

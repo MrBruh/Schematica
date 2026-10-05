@@ -180,6 +180,21 @@ public final class Names {
             public static final String UNDO = "undo";
             public static final String FORCE = "force";
         }
+
+        public static final class PasteHere {
+
+            public static final class Message {
+
+                public static final String USAGE = "schematica.command.pasteHere.usage";
+                public static final String NO_SCHEMATIC = "schematica.command.pasteHere.noSchematic";
+                public static final String TRANSFORMED = "schematica.command.pasteHere.transformed";
+                public static final String NO_PATH = "schematica.command.pasteHere.noPath";
+                public static final String UNSENDABLE_PATH = "schematica.command.pasteHere.unsendablePath";
+                public static final String TOO_LONG = "schematica.command.pasteHere.tooLong";
+            }
+
+            public static final String NAME = "schematicaPasteHere";
+        }
     }
 
     public static final class Gui {

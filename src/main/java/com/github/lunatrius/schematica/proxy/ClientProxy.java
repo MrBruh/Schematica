@@ -17,6 +17,7 @@ import net.minecraft.client.settings.KeyBinding;
 import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.util.MathHelper;
 import net.minecraft.util.MovingObjectPosition;
+import net.minecraftforge.client.ClientCommandHandler;
 import net.minecraftforge.common.MinecraftForge;
 import net.minecraftforge.common.config.Property;
 import net.minecraftforge.common.util.ForgeDirection;
@@ -27,6 +28,7 @@ import com.github.lunatrius.schematica.api.ISchematic;
 import com.github.lunatrius.schematica.client.printer.SchematicPrinter;
 import com.github.lunatrius.schematica.client.renderer.RendererSchematicGlobal;
 import com.github.lunatrius.schematica.client.world.SchematicWorld;
+import com.github.lunatrius.schematica.command.client.CommandSchematicaPasteHere;
 import com.github.lunatrius.schematica.compat.ILOTRPresent;
 import com.github.lunatrius.schematica.compat.NoLOTRProxy;
 import com.github.lunatrius.schematica.handler.ConfigurationHandler;
@@ -39,6 +41,7 @@ import com.github.lunatrius.schematica.handler.client.WorldHandler;
 import com.github.lunatrius.schematica.reference.Constants;
 import com.github.lunatrius.schematica.reference.Reference;
 import com.github.lunatrius.schematica.util.Coordinates;
+import com.github.lunatrius.schematica.util.FileUtils;
 import com.github.lunatrius.schematica.world.schematic.SchematicFormat;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
@@ -337,6 +340,8 @@ public class ClientProxy extends CommonProxy {
         MinecraftForge.EVENT_BUS.register(ChatEventHandler.INSTANCE);
         MinecraftForge.EVENT_BUS.register(new OverlayHandler());
         MinecraftForge.EVENT_BUS.register(new WorldHandler());
+
+        ClientCommandHandler.instance.registerCommand(new CommandSchematicaPasteHere());
     }
 
     @Override
@@ -402,6 +407,8 @@ public class ClientProxy extends CommonProxy {
         }
 
         SchematicWorld world = new SchematicWorld(schematic, filename);
+        world.relativePath = FileUtils
+            .relativePath(ConfigurationHandler.schematicDirectory, new File(directory, filename));
 
         Reference.logger
             .debug("Loaded {} [w:{},h:{},l:{}]", filename, world.getWidth(), world.getHeight(), world.getLength());
