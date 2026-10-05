@@ -15,6 +15,7 @@ import net.minecraft.world.World;
 import com.github.lunatrius.core.util.vector.Vector3i;
 import com.github.lunatrius.schematica.api.ISchematic;
 import com.github.lunatrius.schematica.command.CommandSchematicaList;
+import com.github.lunatrius.schematica.command.CommandSchematicaPaste;
 import com.github.lunatrius.schematica.command.CommandSchematicaRemove;
 import com.github.lunatrius.schematica.command.CommandSchematicaSave;
 import com.github.lunatrius.schematica.handler.ConfigurationHandler;
@@ -26,6 +27,7 @@ import com.github.lunatrius.schematica.nbt.NBTHelper;
 import com.github.lunatrius.schematica.network.PacketHandler;
 import com.github.lunatrius.schematica.reference.Reference;
 import com.github.lunatrius.schematica.world.chunk.SchematicContainer;
+import com.github.lunatrius.schematica.world.paste.SchematicPaster;
 import com.github.lunatrius.schematica.world.schematic.SchematicUtil;
 import com.github.lunatrius.schematica.world.storage.Schematic;
 
@@ -69,6 +71,11 @@ public abstract class CommonProxy {
             event.registerServerCommand(new CommandSchematicaList());
             event.registerServerCommand(new CommandSchematicaRemove());
         }
+
+        // Operators only, and it reads the player's own schematic directory, so it does not depend on the
+        // serverside schematics switch.
+        SchematicPaster.clearUndoHistory();
+        event.registerServerCommand(new CommandSchematicaPaste());
     }
 
     public void createFolders() {
