@@ -170,6 +170,7 @@ public final class Names {
                 public static final String MACHINES_WITHOUT_DATA = "schematica.command.paste.machinesWithoutData";
                 public static final String NOT_EMPTY = "schematica.command.paste.notEmpty";
                 public static final String PASTED = "schematica.command.paste.pasted";
+                public static final String PASTED_SKIPPED = "schematica.command.paste.pastedSkipped";
                 public static final String WARNINGS = "schematica.command.paste.warnings";
                 public static final String NOTHING_TO_UNDO = "schematica.command.paste.nothingToUndo";
                 public static final String UNDO_NOT_LOADED = "schematica.command.paste.undoNotLoaded";

@@ -175,6 +175,7 @@ schematica.command.paste.unknownBlocks=Nothing was pasted: this game has no bloc
 schematica.command.paste.machinesWithoutData=Nothing was pasted: %d GregTech machine blocks have no tile entity data in the file (the first at %s), so they would load as broken machines.
 schematica.command.paste.notEmpty=Nothing was pasted: %d blocks are in the way (the first at %s). Add force to replace them.
 schematica.command.paste.pasted=Pasted %s at %d %d %d: %d blocks and %d tile entities.
+schematica.command.paste.pastedSkipped=Pasted %s at %d %d %d: %d blocks and %d tile entities. Skipped %d blocks for you to place by hand.
 schematica.command.paste.warnings=%d warnings, all in the server log. The first: %s
 schematica.command.paste.nothingToUndo=You have no paste to undo.
 schematica.command.paste.undoNotLoaded=The area of your last paste is not loaded. Go back to it and try again.

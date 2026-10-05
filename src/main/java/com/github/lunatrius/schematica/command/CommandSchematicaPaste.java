@@ -123,15 +123,28 @@ public class CommandSchematicaPaste extends CommandBase {
         final SchematicPaster.Result result = SchematicPaster
             .paste(player, player.worldObj, file, extendedFormat, x, y, z, force);
 
-        sender.addChatMessage(
-            new ChatComponentTranslation(
-                Names.Command.Paste.Message.PASTED,
-                name,
-                x,
-                y,
-                z,
-                result.blocks,
-                result.tileEntities));
+        if (result.skippedBlocks > 0) {
+            sender.addChatMessage(
+                new ChatComponentTranslation(
+                    Names.Command.Paste.Message.PASTED_SKIPPED,
+                    name,
+                    x,
+                    y,
+                    z,
+                    result.blocks,
+                    result.tileEntities,
+                    result.skippedBlocks));
+        } else {
+            sender.addChatMessage(
+                new ChatComponentTranslation(
+                    Names.Command.Paste.Message.PASTED,
+                    name,
+                    x,
+                    y,
+                    z,
+                    result.blocks,
+                    result.tileEntities));
+        }
         if (!result.warnings.isEmpty()) {
             final ChatComponentTranslation warnings = new ChatComponentTranslation(
                 Names.Command.Paste.Message.WARNINGS,

@@ -51,9 +51,10 @@ import cpw.mods.fml.common.registry.GameData;
  *  preflight, refusing before anything changes:
  *    size under pasteVolumeLimit, y within 0..255, every chunk loaded,
  *    every block registered, no GT machine without tile NBT,
- *    nothing solid in the way unless force
+ *    (not a refusal: skip, with a warning, any GT frame without tile NBT, as the file does not record its material)
+ *    nothing solid in the way unless force, skipped cells aside
  *
- *  write:
+ *  write, leaving every skipped cell as it is:
  *    GT: hold back its machine update queue, so the paste loads like a chunk (GTPasteUpdates)
  *    | force: empty the inventories in the box, so nothing spills
  *    | setBlock(flag 2) on every cell, bottom up (a GT frame's metadata comes from its tile NBT)
@@ -150,31 +151,39 @@ public final class SchematicPaster {
         final Block[] cells = resolveBlocks(blocks);
         final Map<Integer, NBTTagCompound> tiles = readTileEntities(root, blocks, box, warnings);
         final int[] metadata = blocks.metadata.clone();
+        // Cells the paste leaves exactly as they are in the world, each with a warning saying why.
+        final boolean[] skipped = new boolean[cells.length];
 
         final GTPasteCompat gregtech = GTPasteCompat.create();
         if (gregtech != null) {
             refuseMachinesWithoutData(gregtech, blocks, box, cells, tiles);
-            planFrames(gregtech, blocks, box, cells, tiles, metadata, warnings);
+            planFrames(gregtech, blocks, box, cells, tiles, metadata, skipped, warnings);
         }
 
         if (!force) {
-            refuseOccupiedTarget(world, box);
+            refuseOccupiedTarget(world, box, skipped);
         }
 
         // Nothing has changed in the world until here. GT's machine update queue stays off until every tile entity is
         // in, so the paste loads like a chunk does; see GTPasteUpdates for why.
         int placedBlocks = 0;
+        int skippedBlocks = 0;
         final List<int[]> tileCells = new ArrayList<>();
         final boolean gtUpdatesWereEnabled = gregtech != null && GTPasteUpdates.suspend();
         try {
             if (force) {
-                emptyInventories(world, box, warnings);
+                emptyInventories(world, box, skipped, warnings);
             }
 
             for (int y = 0; y < blocks.height; y++) {
                 for (int z = 0; z < blocks.length; z++) {
                     for (int x = 0; x < blocks.width; x++) {
                         final int index = blocks.index(x, y, z);
+                        if (skipped[index]) {
+                            skippedBlocks++;
+                            continue;
+                        }
+
                         final Block block = cells[index];
                         final int wx = box.minX + x;
                         final int wy = box.minY + y;
@@ -264,8 +273,8 @@ public final class SchematicPaster {
         LAST_PASTES.put(player.getUniqueID(), box);
 
         Reference.logger.info(
-            "{} pasted {} in dimension {} from {} {} {} to {} {} {}{}: {} blocks, {} tile entities, {} spilled items"
-                + " removed, {} warnings",
+            "{} pasted {} in dimension {} from {} {} {} to {} {} {}{}: {} blocks, {} skipped, {} tile entities, {}"
+                + " spilled items removed, {} warnings",
             player.getCommandSenderName(),
             file.getPath(),
             box.dimension,
@@ -277,6 +286,7 @@ public final class SchematicPaster {
             box.maxZ,
             force ? " with force" : "",
             placedBlocks,
+            skippedBlocks,
             tileCells.size(),
             removedItems,
             warnings.size());
@@ -284,7 +294,7 @@ public final class SchematicPaster {
             Reference.logger.warn("Paste of {}: {}", name, warning);
         }
 
-        return new Result(placedBlocks, tileCells.size(), warnings);
+        return new Result(placedBlocks, skippedBlocks, tileCells.size(), warnings);
     }
 
     /**
@@ -310,7 +320,7 @@ public final class SchematicPaster {
         final boolean gregtech = Loader.isModLoaded(GTPasteCompat.MOD_ID);
         final boolean gtUpdatesWereEnabled = gregtech && GTPasteUpdates.suspend();
         try {
-            emptyInventories(world, box, warnings);
+            emptyInventories(world, box, null, warnings);
             for (int y = box.maxY; y >= box.minY; y--) {
                 for (int z = box.minZ; z <= box.maxZ; z++) {
                     for (int x = box.minX; x <= box.maxX; x++) {
@@ -444,9 +454,13 @@ public final class SchematicPaster {
     /**
      * A GT frame's material does not fit the file's Data byte, so it is read back from the frame's tile entity, and a
      * frame keeps that tile entity only when it has covers, exactly as in a world.
+     * <p>
+     * A frame without that tile entity (only Schematica's own saves drop it) is skipped: its Data byte holds just the
+     * low four bits of the material, which name a different and usually untextured material (Steel, 305, would become
+     * Hydrogen, 1, and be invisible), so the builder places it by hand instead.
      */
     private static void planFrames(final GTPasteCompat gregtech, final DecodedBlocks blocks, final PasteBox box,
-        final Block[] cells, final Map<Integer, NBTTagCompound> tiles, final int[] metadata,
+        final Block[] cells, final Map<Integer, NBTTagCompound> tiles, final int[] metadata, final boolean[] skipped,
         final List<String> warnings) {
         for (int i = 0; i < cells.length; i++) {
             if (!gregtech.isFrame(cells[i])) {
@@ -457,10 +471,11 @@ public final class SchematicPaster {
             if (frameMetadata < 0) {
                 warnings.add(
                     String.format(
-                        "GT frame at %s has no frame tile entity to read its material from, so it keeps the file's"
-                            + " metadata %d",
-                        describe(worldPosition(blocks, box, i)),
-                        metadata[i]));
+                        "Skipped the GT frame at %s because the file does not record its material (it has no frame"
+                            + " tile entity); place it by hand",
+                        describe(worldPosition(blocks, box, i))));
+                skipped[i] = true;
+                tiles.remove(i);
                 continue;
             }
 
@@ -472,14 +487,19 @@ public final class SchematicPaster {
     }
 
     /**
-     * Refuses the paste if any block in the box is neither air nor replaceable.
+     * Refuses the paste if any block in the box is neither air nor replaceable, apart from the skipped cells, which the
+     * paste does not touch.
      */
-    private static void refuseOccupiedTarget(final World world, final PasteBox box) {
+    private static void refuseOccupiedTarget(final World world, final PasteBox box, final boolean[] skipped) {
         int count = 0;
         String first = null;
         for (int y = box.minY; y <= box.maxY; y++) {
             for (int z = box.minZ; z <= box.maxZ; z++) {
                 for (int x = box.minX; x <= box.maxX; x++) {
+                    if (skipped[box.index(x, y, z)]) {
+                        continue;
+                    }
+
                     final Block existing = world.getBlock(x, y, z);
                     if (!existing.isAir(world, x, y, z) && !existing.isReplaceable(world, x, y, z)) {
                         count++;
@@ -498,11 +518,18 @@ public final class SchematicPaster {
 
     /**
      * Empties every inventory in the box, so replacing or removing its block spills nothing.
+     *
+     * @param skipped the cells to leave alone, as the paste does not replace their blocks, or null for none
      */
-    private static void emptyInventories(final World world, final PasteBox box, final List<String> warnings) {
+    private static void emptyInventories(final World world, final PasteBox box, final boolean[] skipped,
+        final List<String> warnings) {
         for (int y = box.minY; y <= box.maxY; y++) {
             for (int z = box.minZ; z <= box.maxZ; z++) {
                 for (int x = box.minX; x <= box.maxX; x++) {
+                    if (skipped != null && skipped[box.index(x, y, z)]) {
+                        continue;
+                    }
+
                     if (!world.getBlock(x, y, z)
                         .hasTileEntity(world.getBlockMetadata(x, y, z))) {
                         continue;
@@ -571,12 +598,15 @@ public final class SchematicPaster {
 
         /** Cells that are not air. */
         public final int blocks;
+        /** Cells left as they were in the world, for the builder to place by hand; each has a warning. */
+        public final int skippedBlocks;
         public final int tileEntities;
         /** Everything that did not paste as the file says, in English, for chat and the log. */
         public final List<String> warnings;
 
-        private Result(final int blocks, final int tileEntities, final List<String> warnings) {
+        private Result(final int blocks, final int skippedBlocks, final int tileEntities, final List<String> warnings) {
             this.blocks = blocks;
+            this.skippedBlocks = skippedBlocks;
             this.tileEntities = tileEntities;
             this.warnings = warnings;
         }
@@ -616,6 +646,13 @@ public final class SchematicPaster {
 
         public int sizeZ() {
             return this.maxZ - this.minZ + 1;
+        }
+
+        /**
+         * The cell index of world position {@code x y z}, in the schematic's own cell order.
+         */
+        int index(final int x, final int y, final int z) {
+            return (x - this.minX) + ((y - this.minY) * sizeZ() + (z - this.minZ)) * sizeX();
         }
     }
 }
