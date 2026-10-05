@@ -3,4 +3,14 @@
 dependencies {
 	implementation('com.github.GTNewHorizons:LunatriusCore:1.2.1-GTNH:dev')
     compileOnly rfg.deobf('curse.maven:lotr-423748:4091561')
+
+    // GregTech and StructureLib, for the late mixin that renders a multiblock controller's front the
+    // right way round in the hologram. Compile-only and non-transitive: the mixin applies only when
+    // GregTech is loaded, and the jar must not pull in GregTech's dependency tree. GTNHLib and
+    // ModularUI2 are there only because javac must resolve the supertypes of GregTech's tile entity
+    // interfaces; their versions are the ones GregTech 5.09.54.133 compiles against.
+    compileOnly('com.github.GTNewHorizons:GT5-Unofficial:5.09.54.133:dev') { transitive = false }
+    compileOnly('com.github.GTNewHorizons:StructureLib:1.4.42:dev') { transitive = false }
+    compileOnly('com.github.GTNewHorizons:GTNHLib:0.11.45:dev') { transitive = false }
+    compileOnly('com.github.GTNewHorizons:ModularUI2:2.3.88-1.7.10:dev') { transitive = false }
 }
