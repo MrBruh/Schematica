@@ -40,6 +40,8 @@ public class SchematicWorld extends World {
         WorldType.FLAT);
 
     public String name = "";
+    /** The file's path below the schematic directory, with forward slashes, or null when it is not known. */
+    public String relativePath = null;
     public static final ItemStack DEFAULT_ICON = new ItemStack(Blocks.grass);
 
     private ISchematic schematic;

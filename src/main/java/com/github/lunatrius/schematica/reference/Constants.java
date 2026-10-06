@@ -52,5 +52,8 @@ public final class Constants {
 
         // + .json
         public static final String Coordinates = "Coordinates";
+
+        public static final String EXTENSION_SCHEMATIC = ".schematic";
+        public static final String EXTENSION_SCHEMPLUS = ".schemplus";
     }
 }

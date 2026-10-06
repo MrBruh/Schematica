@@ -2,6 +2,7 @@ package com.github.lunatrius.schematica.util;
 
 import java.io.File;
 import java.io.IOException;
+import java.nio.file.Path;
 
 import com.github.lunatrius.schematica.reference.Reference;
 
@@ -34,5 +35,27 @@ public class FileUtils {
         }
 
         return false;
+    }
+
+    /**
+     * The path of {@code file} below {@code root}, with forward slashes whatever the platform, or null when the file
+     * is not below the root.
+     */
+    public static String relativePath(final File root, final File file) {
+        try {
+            final Path rootPath = root.getCanonicalFile()
+                .toPath();
+            final Path filePath = file.getCanonicalFile()
+                .toPath();
+            if (filePath.startsWith(rootPath) && !filePath.equals(rootPath)) {
+                return rootPath.relativize(filePath)
+                    .toString()
+                    .replace(File.separatorChar, '/');
+            }
+        } catch (IOException e) {
+            Reference.logger.error("", e);
+        }
+
+        return null;
     }
 }

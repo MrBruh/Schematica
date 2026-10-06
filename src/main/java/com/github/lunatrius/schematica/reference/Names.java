@@ -77,6 +77,9 @@ public final class Names {
         public static final String SERVERSIDE_SCHEMATICS_ENABLED = "serversideSchematicsEnabled";
         public static final String SERVERSIDE_SCHEMATICS_ENABLED_DESC = "Allow players to save schematics serverside, download schematics and see serverside schematics";
 
+        public static final String PASTE_VOLUME_LIMIT = "pasteVolumeLimit";
+        public static final String PASTE_VOLUME_LIMIT_DESC = "The largest schematic (width x height x length, air included) that /schematicaPaste writes into the world in one go.";
+
         public static final String LANG_PREFIX = Reference.MODID.toLowerCase() + ".config";
     }
 
@@ -147,6 +150,51 @@ public final class Names {
             }
 
             public static final String NAME = "schematicaDownload";
+        }
+
+        public static final class Paste {
+
+            public static final class Message {
+
+                public static final String USAGE = "schematica.command.paste.usage";
+                public static final String PLAYERS_ONLY = "schematica.command.save.playersOnly";
+                public static final String DIRECTORY_UNAVAILABLE = "schematica.command.paste.directoryUnavailable";
+                public static final String NOT_FOUND = "schematica.command.paste.notFound";
+                public static final String READ_FAILED = "schematica.command.paste.readFailed";
+                public static final String UNSUPPORTED_FORMAT = "schematica.command.paste.unsupportedFormat";
+                public static final String EMPTY = "schematica.command.paste.empty";
+                public static final String TOO_LARGE = "schematica.command.paste.tooLarge";
+                public static final String OUT_OF_HEIGHT = "schematica.command.paste.outOfHeight";
+                public static final String NOT_LOADED = "schematica.command.paste.notLoaded";
+                public static final String UNKNOWN_BLOCKS = "schematica.command.paste.unknownBlocks";
+                public static final String MACHINES_WITHOUT_DATA = "schematica.command.paste.machinesWithoutData";
+                public static final String NOT_EMPTY = "schematica.command.paste.notEmpty";
+                public static final String PASTED = "schematica.command.paste.pasted";
+                public static final String PASTED_SKIPPED = "schematica.command.paste.pastedSkipped";
+                public static final String WARNINGS = "schematica.command.paste.warnings";
+                public static final String NOTHING_TO_UNDO = "schematica.command.paste.nothingToUndo";
+                public static final String UNDO_NOT_LOADED = "schematica.command.paste.undoNotLoaded";
+                public static final String UNDONE = "schematica.command.paste.undone";
+            }
+
+            public static final String NAME = "schematicaPaste";
+            public static final String UNDO = "undo";
+            public static final String FORCE = "force";
+        }
+
+        public static final class PasteHere {
+
+            public static final class Message {
+
+                public static final String USAGE = "schematica.command.pasteHere.usage";
+                public static final String NO_SCHEMATIC = "schematica.command.pasteHere.noSchematic";
+                public static final String TRANSFORMED = "schematica.command.pasteHere.transformed";
+                public static final String NO_PATH = "schematica.command.pasteHere.noPath";
+                public static final String UNSENDABLE_PATH = "schematica.command.pasteHere.unsendablePath";
+                public static final String TOO_LONG = "schematica.command.pasteHere.tooLong";
+            }
+
+            public static final String NAME = "schematicaPasteHere";
         }
     }
 

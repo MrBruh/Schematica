@@ -56,6 +56,7 @@ public class ConfigurationHandler {
     public static final boolean LOAD_ENABLED_DEFAULT = true;
     public static final int PLAYER_QUOTA_KILOBYTES_DEFAULT = 8192;
     public static final boolean SERVERSIDE_SCHEMATICS_ENABLED_DEFAULT = true;
+    public static final int PASTE_VOLUME_LIMIT_DEFAULT = 100000;
 
     public static boolean showDebugInfo = SHOW_DEBUG_INFO_DEFAULT;
     public static boolean useSchematicplusFormat = EXTENDED_ID_FORMAT_DEFAULT;
@@ -82,6 +83,7 @@ public class ConfigurationHandler {
     public static boolean loadEnabled = LOAD_ENABLED_DEFAULT;
     public static int playerQuotaKilobytes = PLAYER_QUOTA_KILOBYTES_DEFAULT;
     public static boolean serversideSchematicsEnabled = SERVERSIDE_SCHEMATICS_ENABLED_DEFAULT;
+    public static int pasteVolumeLimit = PASTE_VOLUME_LIMIT_DEFAULT;
 
     public static Property propShowDebugInfo = null;
     public static Property propUseSchematicplusFormat = null;
@@ -107,6 +109,7 @@ public class ConfigurationHandler {
     public static Property propLoadEnabled = null;
     public static Property propPlayerQuotaKilobytes = null;
     public static Property propServersideSchematicsEnabled = null;
+    public static Property propPasteVolumeLimit = null;
 
     private static final Set<Block> extraAirBlockList = new HashSet<>();
 
@@ -340,6 +343,16 @@ public class ConfigurationHandler {
         propServersideSchematicsEnabled
             .setLanguageKey(Names.Config.LANG_PREFIX + "." + Names.Config.SERVERSIDE_SCHEMATICS_ENABLED);
         serversideSchematicsEnabled = propServersideSchematicsEnabled.getBoolean(SERVERSIDE_SCHEMATICS_ENABLED_DEFAULT);
+
+        propPasteVolumeLimit = configuration.get(
+            Names.Config.Category.SERVER,
+            Names.Config.PASTE_VOLUME_LIMIT,
+            PASTE_VOLUME_LIMIT_DEFAULT,
+            Names.Config.PASTE_VOLUME_LIMIT_DESC,
+            1,
+            Integer.MAX_VALUE);
+        propPasteVolumeLimit.setLanguageKey(Names.Config.LANG_PREFIX + "." + Names.Config.PASTE_VOLUME_LIMIT);
+        pasteVolumeLimit = propPasteVolumeLimit.getInt(PASTE_VOLUME_LIMIT_DEFAULT);
 
         Schematica.proxy.createFolders();
 
